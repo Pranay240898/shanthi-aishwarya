@@ -17,7 +17,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="text-company-blue font-bold text-2xl">
-            WindowWise
+            Shanthi Aishwarya uPVC Windows and Doors Ltd.
           </Link>
 
           {/* Desktop Navigation */}
