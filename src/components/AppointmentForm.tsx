@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -24,9 +24,15 @@ import {
 } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
+import { format, addDays } from 'date-fns';
+import { CalendarIcon, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { appointmentService } from '@/services/appointmentService';
+import { 
+  Alert,
+  AlertTitle,
+  AlertDescription
+} from '@/components/ui/alert';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -39,6 +45,11 @@ const formSchema = z.object({
 });
 
 const AppointmentForm = () => {
+  const [availableSlots, setAvailableSlots] = useState<Date[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedTime, setSelectedTime] = useState<Date | undefined>(undefined);
+  const [showAlert, setShowAlert] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -51,17 +62,63 @@ const AppointmentForm = () => {
     }
   });
 
+  // Update available time slots when date changes
+  useEffect(() => {
+    if (selectedDate) {
+      const slots = appointmentService.getAvailableSlots(selectedDate);
+      setAvailableSlots(slots);
+      
+      // Reset selected time if it's no longer available
+      if (selectedTime && !slots.find(slot => slot.getTime() === selectedTime.getTime())) {
+        setSelectedTime(undefined);
+        form.setValue('appointmentDate', selectedDate); // Set only the date, not the time
+      }
+      
+      // Show alert if no slots available
+      setShowAlert(slots.length === 0);
+    }
+  }, [selectedDate, selectedTime, form]);
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
+      // Reset time when date changes
+      setSelectedTime(undefined);
+      form.setValue('appointmentDate', date);
+    }
+  };
+
+  const handleTimeSelect = (time: Date) => {
+    setSelectedTime(time);
+    form.setValue('appointmentDate', time);
+  };
+
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    console.log("Form data:", data);
-    
-    // Show success message
-    toast({
-      title: "Appointment request submitted!",
-      description: "We'll contact you shortly to confirm your appointment.",
-    });
-    
-    // Reset form
-    form.reset();
+    try {
+      // Add the appointment
+      const newAppointment = appointmentService.addAppointment(data);
+      
+      console.log("Appointment created:", newAppointment);
+      
+      // Show success message
+      toast({
+        title: "Appointment request submitted!",
+        description: `We'll contact you shortly to confirm your appointment for ${appointmentService.formatAppointmentDate(data.appointmentDate)}.`,
+      });
+      
+      // Reset form
+      form.reset();
+      setSelectedDate(undefined);
+      setSelectedTime(undefined);
+      
+    } catch (error) {
+      // Show error message if there was a conflict
+      toast({
+        title: "Booking Error",
+        description: error instanceof Error ? error.message : "Failed to book appointment. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -208,38 +265,74 @@ const AppointmentForm = () => {
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Preferred Appointment Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Select a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              date < new Date(new Date().setHours(0, 0, 0, 0))
-                            }
-                            initialFocus
-                            className={cn("p-3 pointer-events-auto")}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <div className="grid grid-cols-1 gap-4">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !selectedDate && "text-muted-foreground"
+                                )}
+                              >
+                                {selectedDate ? (
+                                  format(selectedDate, "PPP")
+                                ) : (
+                                  <span>Select a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={selectedDate}
+                              onSelect={handleDateSelect}
+                              disabled={(date) =>
+                                date < new Date(new Date().setHours(0, 0, 0, 0)) ||
+                                date > addDays(new Date(), 90)
+                              }
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        
+                        {showAlert && selectedDate && (
+                          <Alert variant="destructive" className="mt-2">
+                            <AlertTitle>No available slots</AlertTitle>
+                            <AlertDescription>
+                              There are no available appointment slots for the selected date. 
+                              Please select another date.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        
+                        {selectedDate && availableSlots.length > 0 && (
+                          <div className="mt-2">
+                            <FormLabel>Select Time Slot</FormLabel>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                              {availableSlots.map((slot, index) => (
+                                <Button
+                                  key={index}
+                                  type="button"
+                                  variant={selectedTime?.getTime() === slot.getTime() ? "default" : "outline"}
+                                  onClick={() => handleTimeSelect(slot)}
+                                  className={cn(
+                                    "justify-start px-3",
+                                    selectedTime?.getTime() === slot.getTime() && "bg-company-blue"
+                                  )}
+                                >
+                                  <Clock className="mr-2 h-4 w-4" />
+                                  {format(slot, "h:mm a")}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -263,7 +356,13 @@ const AppointmentForm = () => {
                   )}
                 />
                 
-                <Button type="submit" className="btn-primary w-full">Book Appointment</Button>
+                <Button 
+                  type="submit" 
+                  className="btn-primary w-full"
+                  disabled={!selectedTime || form.formState.isSubmitting}
+                >
+                  {form.formState.isSubmitting ? "Submitting..." : "Book Appointment"}
+                </Button>
               </form>
             </Form>
           </div>

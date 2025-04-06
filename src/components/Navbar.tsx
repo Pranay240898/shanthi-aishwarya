@@ -2,13 +2,23 @@
 import React, { useState } from 'react';
 import { Menu, X, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  // Helper to determine if a link is active
+  const isActive = (path: string) => {
+    if (path === '/') {
+      return location.pathname === path;
+    }
+    // For other paths, check if the current path includes the path segment
+    return location.pathname.includes(path);
   };
 
   return (
@@ -22,19 +32,34 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link to="/" className="text-company-darkgray hover:text-company-blue transition-colors">
+            <Link 
+              to="/" 
+              className={`transition-colors ${isActive('/') ? 'text-company-blue font-medium' : 'text-company-darkgray hover:text-company-blue'}`}
+            >
               Home
             </Link>
-            <Link to="/#products" className="text-company-darkgray hover:text-company-blue transition-colors">
+            <Link 
+              to="/products" 
+              className={`transition-colors ${isActive('/products') ? 'text-company-blue font-medium' : 'text-company-darkgray hover:text-company-blue'}`}
+            >
               Products
             </Link>
-            <Link to="/#projects" className="text-company-darkgray hover:text-company-blue transition-colors">
+            <Link 
+              to="/projects" 
+              className={`transition-colors ${isActive('/projects') ? 'text-company-blue font-medium' : 'text-company-darkgray hover:text-company-blue'}`}
+            >
               Projects
             </Link>
-            <Link to="/#about" className="text-company-darkgray hover:text-company-blue transition-colors">
+            <Link 
+              to="/about" 
+              className={`transition-colors ${isActive('/about') ? 'text-company-blue font-medium' : 'text-company-darkgray hover:text-company-blue'}`}
+            >
               About
             </Link>
-            <Link to="/#contact" className="text-company-darkgray hover:text-company-blue transition-colors">
+            <Link 
+              to="/#contact" 
+              className="text-company-darkgray hover:text-company-blue transition-colors"
+            >
               Contact
             </Link>
           </div>
@@ -45,7 +70,9 @@ const Navbar = () => {
               <Phone className="h-4 w-4 mr-2" />
               <span className="font-medium">+1 (555) 123-4567</span>
             </div>
-            <Button className="btn-primary">Book Appointment</Button>
+            <Link to="/#contact">
+              <Button className="btn-primary">Book Appointment</Button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -65,28 +92,28 @@ const Navbar = () => {
             <div className="flex flex-col space-y-4">
               <Link 
                 to="/" 
-                className="text-company-darkgray hover:text-company-blue transition-colors"
+                className={`transition-colors ${isActive('/') ? 'text-company-blue font-medium' : 'text-company-darkgray hover:text-company-blue'}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Home
               </Link>
               <Link 
-                to="/#products" 
-                className="text-company-darkgray hover:text-company-blue transition-colors"
+                to="/products" 
+                className={`transition-colors ${isActive('/products') ? 'text-company-blue font-medium' : 'text-company-darkgray hover:text-company-blue'}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Products
               </Link>
               <Link 
-                to="/#projects" 
-                className="text-company-darkgray hover:text-company-blue transition-colors"
+                to="/projects" 
+                className={`transition-colors ${isActive('/projects') ? 'text-company-blue font-medium' : 'text-company-darkgray hover:text-company-blue'}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Projects
               </Link>
               <Link 
-                to="/#about" 
-                className="text-company-darkgray hover:text-company-blue transition-colors"
+                to="/about" 
+                className={`transition-colors ${isActive('/about') ? 'text-company-blue font-medium' : 'text-company-darkgray hover:text-company-blue'}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 About
@@ -102,7 +129,9 @@ const Navbar = () => {
                 <Phone className="h-4 w-4 mr-2" />
                 <span className="font-medium">+1 (555) 123-4567</span>
               </div>
-              <Button className="btn-primary w-full">Book Appointment</Button>
+              <Link to="/#contact" onClick={() => setMobileMenuOpen(false)}>
+                <Button className="btn-primary w-full">Book Appointment</Button>
+              </Link>
             </div>
           </div>
         )}
