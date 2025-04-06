@@ -28,6 +28,8 @@ import { format, addDays } from 'date-fns';
 import { CalendarIcon, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { appointmentService } from '@/services/appointmentService';
+import { appointmentTracker } from '@/services/appointmentTracker';
+import { authUtils } from '@/utils/authUtils';
 import { 
   Alert,
   AlertTitle,
@@ -53,6 +55,8 @@ const AppointmentForm = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<Date | undefined>(undefined);
   const [showAlert, setShowAlert] = useState(false);
+  const [remainingRequests, setRemainingRequests] = useState<number>(5); // Default max requests
+  const [clientIp, setClientIp] = useState<string>('127.0.0.1'); // Default for local testing
 
   const form = useForm<AppointmentFormValues>({
     resolver: zodResolver(formSchema),
@@ -65,6 +69,26 @@ const AppointmentForm = () => {
       message: ""
     }
   });
+
+  // Simulate getting the client IP (in a real app, this would come from the server)
+  useEffect(() => {
+    // Simulate an API call to get the client's IP
+    // In production, this would be handled by the server
+    const getClientIp = async () => {
+      try {
+        // This is just for simulation - in production you'd get the IP from the server
+        const fakeIp = `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+        setClientIp(fakeIp);
+        
+        // Update remaining requests based on this IP
+        setRemainingRequests(appointmentTracker.getRemainingRequests(fakeIp));
+      } catch (error) {
+        console.error('Error getting client IP:', error);
+      }
+    };
+    
+    getClientIp();
+  }, []);
 
   // Update available time slots when date changes
   useEffect(() => {
@@ -83,6 +107,15 @@ const AppointmentForm = () => {
     }
   }, [selectedDate, selectedTime, form]);
 
+  // Pre-fill form with authenticated user data if available
+  useEffect(() => {
+    const userInfo = authUtils.getUserInfo();
+    if (userInfo) {
+      form.setValue('name', userInfo.name);
+      form.setValue('email', userInfo.email);
+    }
+  }, [form]);
+
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
@@ -99,10 +132,34 @@ const AppointmentForm = () => {
 
   const onSubmit = (values: AppointmentFormValues) => {
     try {
+      // Check if this request is allowed by rate limiting
+      const rateCheckResult = appointmentTracker.trackAppointmentRequest(clientIp);
+      if (!rateCheckResult.allowed) {
+        toast({
+          title: "Rate Limit Exceeded",
+          description: rateCheckResult.reason,
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // Add the appointment - all required fields are guaranteed to exist due to form validation
       const newAppointment = appointmentService.addAppointment(values);
       
       console.log("Appointment created:", newAppointment);
+      
+      // Update remaining requests count
+      setRemainingRequests(appointmentTracker.getRemainingRequests(clientIp));
+      
+      // Generate and store a JWT token for this user if not already authenticated
+      if (!authUtils.isAuthenticated()) {
+        const token = authUtils.generateToken(
+          Date.now().toString(), // Mock user ID
+          values.name,
+          values.email
+        );
+        authUtils.storeToken(token);
+      }
       
       // Show success message
       toast({
@@ -156,6 +213,18 @@ const AppointmentForm = () => {
                   <p>Information about our installation process and warranty</p>
                 </li>
               </ul>
+            </div>
+            
+            {/* Add rate limit information */}
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h3 className="text-xl font-semibold mb-2">Request Limits</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                To ensure fair usage, we limit appointment requests to 5 per hour per user.
+              </p>
+              <div className="flex items-center justify-between">
+                <span>Remaining requests:</span>
+                <span className="font-medium">{remainingRequests} / 5</span>
+              </div>
             </div>
           </div>
           
@@ -363,10 +432,20 @@ const AppointmentForm = () => {
                 <Button 
                   type="submit" 
                   className="btn-primary w-full"
-                  disabled={!selectedTime || form.formState.isSubmitting}
+                  disabled={!selectedTime || form.formState.isSubmitting || remainingRequests <= 0}
                 >
                   {form.formState.isSubmitting ? "Submitting..." : "Book Appointment"}
                 </Button>
+                
+                {remainingRequests <= 0 && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertTitle>Rate Limit Reached</AlertTitle>
+                    <AlertDescription>
+                      You've reached the maximum number of appointment requests allowed per hour.
+                      Please try again later.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </form>
             </Form>
           </div>
