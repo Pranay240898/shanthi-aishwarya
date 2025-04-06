@@ -34,6 +34,7 @@ import {
   AlertDescription
 } from '@/components/ui/alert';
 
+// Defining the form schema using zod to match the Appointment type requirements
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -44,13 +45,16 @@ const formSchema = z.object({
   message: z.string().optional()
 });
 
+// Define the type for our form
+type AppointmentFormValues = z.infer<typeof formSchema>;
+
 const AppointmentForm = () => {
   const [availableSlots, setAvailableSlots] = useState<Date[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<Date | undefined>(undefined);
   const [showAlert, setShowAlert] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<AppointmentFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
@@ -93,17 +97,17 @@ const AppointmentForm = () => {
     form.setValue('appointmentDate', time);
   };
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const onSubmit = (values: AppointmentFormValues) => {
     try {
-      // Add the appointment
-      const newAppointment = appointmentService.addAppointment(data);
+      // Add the appointment - all required fields are guaranteed to exist due to form validation
+      const newAppointment = appointmentService.addAppointment(values);
       
       console.log("Appointment created:", newAppointment);
       
       // Show success message
       toast({
         title: "Appointment request submitted!",
-        description: `We'll contact you shortly to confirm your appointment for ${appointmentService.formatAppointmentDate(data.appointmentDate)}.`,
+        description: `We'll contact you shortly to confirm your appointment for ${appointmentService.formatAppointmentDate(values.appointmentDate)}.`,
       });
       
       // Reset form
