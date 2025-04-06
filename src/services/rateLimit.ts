@@ -28,16 +28,17 @@ export const rateLimit = {
   shouldLimit: (ip: string, actionType: keyof typeof rateLimit.settings = 'global'): boolean => {
     const now = Date.now();
     const settings = rateLimit.settings[actionType];
+    const storeKey = `${ip}:${String(actionType)}`;
     
     // Initialize if this is the first request from this IP for this action
-    if (!rateLimit.store[`${ip}:${actionType}`]) {
-      rateLimit.store[`${ip}:${actionType}`] = {
+    if (!rateLimit.store[storeKey]) {
+      rateLimit.store[storeKey] = {
         count: 0,
         resetAt: now + settings.windowMs
       };
     }
     
-    const record = rateLimit.store[`${ip}:${actionType}`];
+    const record = rateLimit.store[storeKey];
     
     // Reset counter if the time window has passed
     if (now > record.resetAt) {
@@ -54,7 +55,7 @@ export const rateLimit = {
   getRemainingRequests: (ip: string, actionType: keyof typeof rateLimit.settings = 'global'): number => {
     const now = Date.now();
     const settings = rateLimit.settings[actionType];
-    const record = rateLimit.store[`${ip}:${actionType}`];
+    const record = rateLimit.store[`${ip}:${String(actionType)}`];
     
     if (!record || now > record.resetAt) {
       return settings.maxRequests;
@@ -66,7 +67,7 @@ export const rateLimit = {
   // Get time until reset in milliseconds
   getTimeUntilReset: (ip: string, actionType: keyof typeof rateLimit.settings = 'global'): number => {
     const now = Date.now();
-    const record = rateLimit.store[`${ip}:${actionType}`];
+    const record = rateLimit.store[`${ip}:${String(actionType)}`];
     
     if (!record) {
       return 0;

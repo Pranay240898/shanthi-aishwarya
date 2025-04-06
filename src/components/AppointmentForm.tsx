@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,7 +35,6 @@ import {
   AlertDescription
 } from '@/components/ui/alert';
 
-// Defining the form schema using zod to match the Appointment type requirements
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -47,7 +45,6 @@ const formSchema = z.object({
   message: z.string().optional()
 });
 
-// Define the type for our form
 type AppointmentFormValues = z.infer<typeof formSchema>;
 
 const AppointmentForm = () => {
@@ -55,8 +52,8 @@ const AppointmentForm = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<Date | undefined>(undefined);
   const [showAlert, setShowAlert] = useState(false);
-  const [remainingRequests, setRemainingRequests] = useState<number>(5); // Default max requests
-  const [clientIp, setClientIp] = useState<string>('127.0.0.1'); // Default for local testing
+  const [remainingRequests, setRemainingRequests] = useState<number>(5);
+  const [clientIp, setClientIp] = useState<string>('127.0.0.1');
 
   const form = useForm<AppointmentFormValues>({
     resolver: zodResolver(formSchema),
@@ -70,17 +67,11 @@ const AppointmentForm = () => {
     }
   });
 
-  // Simulate getting the client IP (in a real app, this would come from the server)
   useEffect(() => {
-    // Simulate an API call to get the client's IP
-    // In production, this would be handled by the server
     const getClientIp = async () => {
       try {
-        // This is just for simulation - in production you'd get the IP from the server
         const fakeIp = `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
         setClientIp(fakeIp);
-        
-        // Update remaining requests based on this IP
         setRemainingRequests(appointmentTracker.getRemainingRequests(fakeIp));
       } catch (error) {
         console.error('Error getting client IP:', error);
@@ -90,24 +81,20 @@ const AppointmentForm = () => {
     getClientIp();
   }, []);
 
-  // Update available time slots when date changes
   useEffect(() => {
     if (selectedDate) {
       const slots = appointmentService.getAvailableSlots(selectedDate);
       setAvailableSlots(slots);
       
-      // Reset selected time if it's no longer available
       if (selectedTime && !slots.find(slot => slot.getTime() === selectedTime.getTime())) {
         setSelectedTime(undefined);
-        form.setValue('appointmentDate', selectedDate); // Set only the date, not the time
+        form.setValue('appointmentDate', selectedDate);
       }
       
-      // Show alert if no slots available
       setShowAlert(slots.length === 0);
     }
   }, [selectedDate, selectedTime, form]);
 
-  // Pre-fill form with authenticated user data if available
   useEffect(() => {
     const userInfo = authUtils.getUserInfo();
     if (userInfo) {
@@ -119,7 +106,6 @@ const AppointmentForm = () => {
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
-      // Reset time when date changes
       setSelectedTime(undefined);
       form.setValue('appointmentDate', date);
     }
@@ -132,7 +118,6 @@ const AppointmentForm = () => {
 
   const onSubmit = (values: AppointmentFormValues) => {
     try {
-      // Check if this request is allowed by rate limiting
       const rateCheckResult = appointmentTracker.trackAppointmentRequest(clientIp);
       if (!rateCheckResult.allowed) {
         toast({
@@ -143,37 +128,41 @@ const AppointmentForm = () => {
         return;
       }
       
-      // Add the appointment - all required fields are guaranteed to exist due to form validation
-      const newAppointment = appointmentService.addAppointment(values);
+      const appointmentData = {
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        propertyType: values.propertyType,
+        projectType: values.projectType,
+        appointmentDate: values.appointmentDate,
+        message: values.message || ""
+      };
+      
+      const newAppointment = appointmentService.addAppointment(appointmentData);
       
       console.log("Appointment created:", newAppointment);
       
-      // Update remaining requests count
       setRemainingRequests(appointmentTracker.getRemainingRequests(clientIp));
       
-      // Generate and store a JWT token for this user if not already authenticated
       if (!authUtils.isAuthenticated()) {
         const token = authUtils.generateToken(
-          Date.now().toString(), // Mock user ID
+          Date.now().toString(),
           values.name,
           values.email
         );
         authUtils.storeToken(token);
       }
       
-      // Show success message
       toast({
         title: "Appointment request submitted!",
         description: `We'll contact you shortly to confirm your appointment for ${appointmentService.formatAppointmentDate(values.appointmentDate)}.`,
       });
       
-      // Reset form
       form.reset();
       setSelectedDate(undefined);
       setSelectedTime(undefined);
       
     } catch (error) {
-      // Show error message if there was a conflict
       toast({
         title: "Booking Error",
         description: error instanceof Error ? error.message : "Failed to book appointment. Please try again.",
@@ -215,7 +204,6 @@ const AppointmentForm = () => {
               </ul>
             </div>
             
-            {/* Add rate limit information */}
             <div className="bg-white p-6 rounded-lg shadow-md">
               <h3 className="text-xl font-semibold mb-2">Request Limits</h3>
               <p className="text-sm text-gray-600 mb-2">
